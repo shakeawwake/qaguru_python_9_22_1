@@ -1,54 +1,49 @@
 import os
-
-from dotenv import load_dotenv
-
-import utils
-from utils import file, allure
+from appium.options.android import UiAutomator2Options
+from pydantic import BaseModel
+from utils import file
 
 
-load_dotenv()
+class Config(BaseModel):
+    context: str
+    remote_url: str = os.getenv('REMOTE_URL')
+    device_name: str = os.getenv('deviceName')
+    appWaitActivity: str = os.getenv('appWaitActivity')
+    app: str = os.getenv('app')
+    platformName: str = os.getenv('platformName')
+    platformVersion: str = os.getenv('platformVersion')
+    userName: str = os.getenv('LOGIN')
+    accessKey: str = os.getenv('PASSWORD')
 
-remote_url = os.getenv('remote_url', 'http://127.0.0.1:4723/wb/hub')
-appWaitActivity = os.getenv('appWaitActivity', 'org.wikipedia.*')
-app = os.getenv('app', './app-alpha-universal-release.apk')
-runs_on_bstack = app.startswith('bs://')
-if runs_on_bstack:
-    deviceName = os.getenv('deviceName')
-    remote_url = 'http://hub.browserstack.com/wd/hub'
-    app = 'bs://sample.app'
-bstack_userName = os.getenv('LOGIN')
-bstack_accessKey = os.getenv('PASSWORD')
+    def to_driver_options(self, context):
+
+        options = UiAutomator2Options()
+
+        if context == 'local':
+            options.set_capability('platformName', self.platformName)
+            options.set_capability('remote_url', self.remote_url)
+            options.set_capability('app', file.abs_path_from_project(self.app))
+            options.set_capability('appWaitActivity', self.appWaitActivity)
+
+        if context == 'bs':
+            options.set_capability('remote_url', self.remote_url)
+            options.set_capability('deviceName', self.device_name)
+            options.set_capability('platformName', self.platformName)
+            options.set_capability('platformVersion', self.platformVersion)
+            options.set_capability('appWaitActivity', self.appWaitActivity)
+            options.set_capability('app', self.app)
+            options.set_capability(
+                'bstack:options', {
+                    'projectName': 'First Python project',
+                    'buildName': 'browserstack-build-1',
+                    'sessionName': 'BStack first_test',
+                    'userName': self.userName,
+                    'accessKey': self.accessKey,
+                },
+            )
 
 
-def to_driver_options():
-    from appium.options.android import UiAutomator2Options
-    options = UiAutomator2Options()
+        return options
 
-    # if deviceName:
-    #     options.set_capability('deviceName', deviceName)
-    if runs_on_bstack:
-        options.set_capability('deviceName', deviceName)
 
-    if appWaitActivity:
-        options.set_capability('appWaitActivity', appWaitActivity)
-
-    options.set_capability('app', (
-        app if (app.startswith('/') or runs_on_bstack)
-        else utils.file.abs_path_from_project(app)
-        # else ut
-    ))
-
-    if runs_on_bstack:
-        options.set_capability('platformVersion', '9.0')
-        options.set_capability(
-            'bstack:options', {
-                'projectName': 'First Python project',
-                'buildName': 'browserstack-build-1',
-                'sessionName': 'BStack first_test',
-
-                'userName': bstack_userName,
-                'accessKey': bstack_accessKey,
-            },
-        )
-
-    return options
+config = Config(context='local')

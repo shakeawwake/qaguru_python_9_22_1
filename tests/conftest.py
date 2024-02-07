@@ -1,48 +1,64 @@
-import allure_commons
 import allure
+import allure_commons
 import pytest
-from selene import browser, support
-import os
-
-import config
-import utils
-
 from appium import webdriver
+from dotenv import load_dotenv
+from selene import browser, support
+from utils import allure_attach
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--context",
+        required=False,
+        default="local",
+        choices=['local', 'bs'],
+    )
+
+
+def pytest_configure(config):
+    context = config.getoption("--context")
+    load_dotenv(dotenv_path=f'.env.{context}')
+
+
+@pytest.fixture
+def context(request):
+    return request.config.getoption("--context")
 
 
 @pytest.fixture(scope='function', autouse=True)
-def mobile_management():
-    with allure.step('init app session'):
+def android_mobile_management(context):
+    from config import config
+
+    options = config.to_driver_options(context=context)
+
+
+    with allure.step('setup app session'):
         browser.config.driver = webdriver.Remote(
-            config.remote_url,
-            options=config.to_driver_options()
+            options.get_capability('remote_url'),
+            options=options
         )
 
-    browser.config.timeout = float(os.getenv('timeout', '10.0'))
+    browser.config.timeout = 10.0
 
     browser.config._wait_decorator = support._logging.wait_with(
-        context=allure_commons._allure.StepContext
-    )
+        context=allure_commons._allure.StepContext)
 
     yield
 
-    allure.attach(
-        browser.driver.get_screenshot_as_png(),
-        name='screenshot',
-        attachment_type=allure.attachment_type.PNG,
-    )
+    allure_attach.add_screenshot(browser)
 
-    allure.attach(
-        browser.driver.page_source,
-        name='screen xml dump',
-        attachment_type=allure.attachment_type.XML,
-    )
+    allure_attach.add_xml(browser)
 
-    if config.runs_on_bstack:
-        utils.allure.attach_bstack_video(session_id)
+    if context == 'bs':
         session_id = browser.driver.session_id
 
-        with allure.step('tear down app session with id: ' + session_id):
+        with allure.step('tear down app session with id' + session_id):
             browser.quit()
+
+        bstack = options.get_capability('bstack:options')
+        login = bstack['userName']
+        password = bstack['accessKey']
+        allure_attach.attach_bstack_video(session_id, login, password)
 
     browser.quit()
