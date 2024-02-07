@@ -17,7 +17,7 @@
 
 6. Для запусков тестов локально используйте команду 
   ```bash
-  app=app-alpha-universal-release.apk pytest -s
+  pytest -sv tests/tests_android/test_android.py --context='local'
   ```
 7. Получение отчёта allure:
 ```bash
@@ -28,7 +28,7 @@ allure serve allure-results
 
 1. Выполните
 ```bash
- app=bs://simple.app pytest -s
+ pytest -sv tests/tests_android/test_android.py --context='bs'
 ```
 2. Получение отчёта allure:
 ```bash
